@@ -1,16 +1,4 @@
-#include "ntddk.h"
-#ifndef _DEFINE_H_
-#define _DEFINE_H_
-
-// _number:    0 -> 2047 : reserved for Microsoft 微软保留
-//             2047 -> 4095 : reserved for OEMs 用户自定义     
-#define CODEMSG(_number) CTL_CODE(FILE_DEVICE_UNKNOWN, _number , METHOD_BUFFERED,\
-	FILE_READ_DATA | FILE_WRITE_DATA)
-//定义控制码
-#define INIT_FILE_NAME 2047
-
-#endif
-
+#include "codemsg.h"
 
 
 
@@ -20,10 +8,23 @@
 #define DosDEVICE L"\\DosDevices\\MyDosDevece.com"
 
 
-
+//卸载驱动
 VOID DriverUnload(IN PDRIVER_OBJECT pDriverObject)
 {
-	DbgPrint("Hello World!!\r\n");
+	UNICODE_STRING DosDeviceName;
+
+	//删除符号链接
+	RtlInitUnicodeString(&DosDeviceName, DosDEVICE);
+	IoDeleteSymbolicLink(&DosDeviceName);
+
+	//删除设备对象
+	if (DriverDeviceObject != NULL)
+	{
+		IoDeleteDevice(DriverDeviceObject);
+	}
+	DbgPrint("卸载流程执行成功!");
+
+	
 
 }
 
@@ -92,23 +93,37 @@ NTSTATUS IOManager(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	{
 	case CODEMSG(INIT_FILE_NAME):
 			//从应用层吧这个传进来的buff进行严谨验证
-			__try{
+			__try
+			{
 				if (ValidateWCHARString(buf, size)){
 					//至此以及吧应用层数据传到了内核层
-					DbgPrint("Buf == > %ws:%d\r\n")
+					DbgPrint("Buf == > %ws:%d\r\n");
+					//申请内存吧字符串拷贝过来
+					pwzCopyBuf = (WCHAR*)ExAllocatePoolWithTag(NonPagedPool, size, 'fp');
+
+					if (pwzCopyBuf)
+					{
+						//copy到我们新申请的内存空间来
+						memset(pwzCopyBuf, 0, size);
+						memcpy(pwzCopyBuf, buf, size);
+
+						DbgPrint("CopyBuf===> %ws\r\n", pwzCopyBuf);
+
+						//记得释放
+						ExFreePool(pwzCopyBuf);
+					}
 
 				}
+			}
 
-
-		}
-
+			__except (EXCEPTION_EXECUTE_HANDLER){
+				Irp->IoStatus.Status = GetExceptionCode();
+			}
+			break;
+			
 	
 	}
-
-
-	
-
-
+	return STATUS_SUCCESS;
 
 
 
@@ -141,11 +156,13 @@ nt!_DRIVER_OBJECT
 extern "C" NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING pRegistryPath) // 驱动入口
 {
 	
-	UNICODE_STRING DeviceName;
-	UNICODE_STRING DosDeviceName;
+	UNICODE_STRING DeviceName;  //设备链接名字
+	UNICODE_STRING DosDeviceName;//与之对应的符号链接名字
 	NTSTATUS status;
 
-	PDEVICE_OBJECT DriverDeviceObject; // 定义一个设备对象，用于设备创建
+
+
+
 	//初始化驱动符号名字
 	//UNICODE_STRING是个结构体，主要用作驱动编写的字符串
 
@@ -169,6 +186,17 @@ extern "C" NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STR
 		IoDeleteDevice(DriverDeviceObject); // 销毁设备
 		return status;  // 吧错误返回回去
 	}
+	//创建一个符号链接
+	status = IoCreateSymbolicLink(&DosDeviceName, &DeviceName);
+	if (!NT_SUCCESS(status))
+	{
+		//记得删除设备
+		IoDeleteDevice(DriverDeviceObject);
+		return status;
+	}
+
+
+
 
 	//驱动通讯例程 填写卸载驱动
 	pDriverObject->DriverUnload = DriverUnload;
