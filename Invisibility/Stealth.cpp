@@ -1,9 +1,5 @@
 #include "codemsg.h"
 
-
-
-
-
 #define DEVICE L"\\Device\\MyDevece.com"
 #define DosDEVICE L"\\DosDevices\\MyDosDevece.com"
 
@@ -120,12 +116,9 @@ NTSTATUS IOManager(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 				Irp->IoStatus.Status = GetExceptionCode();
 			}
 			break;
-			
 	
 	}
 	return STATUS_SUCCESS;
-
-
 
 }
 
@@ -158,7 +151,7 @@ extern "C" NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STR
 	
 	UNICODE_STRING DeviceName;  //设备链接名字
 	UNICODE_STRING DosDeviceName;//与之对应的符号链接名字
-	NTSTATUS status;
+	NTSTATUS status;  
 
 
 
