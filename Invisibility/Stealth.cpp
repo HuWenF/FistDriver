@@ -179,7 +179,7 @@ extern "C" NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STR
 		IoDeleteDevice(DriverDeviceObject); // 销毁设备
 		return status;  // 吧错误返回回去
 	}
-	//创建一个符号链接
+	//创建一个符号链接,不然会影响到驱动和应用层通信
 	status = IoCreateSymbolicLink(&DosDeviceName, &DeviceName);
 	if (!NT_SUCCESS(status))
 	{
